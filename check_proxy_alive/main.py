@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# @Author  : Coosh
+import json
+import os
+import sys
+import time
+import requests
+from multiprocessing.pool import Pool
+from multiprocessing import Lock, Queue
+from multiprocessing.queues import Empty
+import chardet
+sys.path.insert(0, os.path.dirname(__file__))
+import config
+
+
+class ProxyDetector(object):
+    # 进程锁
+    MY_LOCK = Lock()
+    MY_PATH = os.path.dirname(__file__)
+    Q = Queue()
+
+    def __init__(self):
+        self.MY_DEBUG = getattr(config, "MY_DEBUG", True)
+        self.MY_TARGET = getattr(config, "MY_TARGET", r"http://ip.cn/?")
+        self.MY_TIMEOUT = getattr(config, "MY_TIMEOUT", 2.0)
+        self.MY_PROCESSES_NUMBER = getattr(config, "MY_PROCESSES_NUMBER", 10)
+        self.MY_HEADERS = getattr(config, "MY_HEADERS", {"User-Agent": r"curl/7.47.0", "Accept": r"*/*", })
+        self.MY_TARGET_CHARACTER = getattr(config, "MY_TARGET_CHARACTER", "")
+
+    def handle_alive_proxy(self, proxy_item):
+        """
+        对有效的代理进行处理
+        :param proxy_item:
+        :return:
+        """
+        ProxyDetector.Q.put(proxy_item)
+        with open(os.path.join(ProxyDetector.MY_PATH, "result.txt"), "a", encoding="utf8") as fp1:
+            line = "|".join([str(proxy_item["type"]).lower(), "%s:%d" % (proxy_item["ip"], proxy_item["port"]),
+                             "%.2fs" % proxy_item["response_avg_seconds"]])
+            fp1.write(line + "\n")
+
+    def content_has_character(self, raw_content: bytes):
+        detect_result = chardet.detect(raw_content)
+        encoding = 'gb18030' if detect_result['encoding'] in ['gbk', 'gb2312'] else 'utf8'
+        content = str(raw_content, encoding=encoding)
+        return self.MY_TARGET_CHARACTER in content
+
+    def check_alive(self, proxy_item):
+        """
+        验证proxy是否有效
+        :param proxy_item: 必须是字典，且有key：type、ip、port
+        :return:
+        """
+        # 全局变量：验证网站、是否调试、超时时间
+        # global MY_TARGET, MY_DEBUG, MY_TIMEOUT
+
+        # 组装requests.get里指定的proxy格式
+        # proxy_type = str(proxy_item["type"]).lower().strip()
+        proxy = dict()
+        proxy["http"] = proxy["https"] = "http://%s:%d" % (proxy_item["ip"], proxy_item["port"])
+        if self.MY_DEBUG:
+            print(proxy)
+        # 为保证质量，一个proxy验证三次（loop_count），必须至少成功两次（success_count），才算有效
+        success_count = 0
+        loop_count = 0
+
+        # 平均响应时间
+        response_times = []
+
+        # 返回的网页原始内容
+        raw_content = b''
+
+        while loop_count < 3:
+            try:
+                loop_count += 1
+
+                # 已经两次失败情况下，没必要进入第三次loop
+                if loop_count == 3 and success_count == 0:
+                    return False
+
+                start_time = time.time()  # 用于计算响应时间
+                resp = requests.get(url=self.MY_TARGET, proxies=proxy, timeout=self.MY_TIMEOUT, headers=self.MY_HEADERS)
+                response_times.append(time.time() - start_time)  # 计算本次响应时间并添加到响应时间列表中
+
+                if resp.status_code == 200:
+                    # 当返回HTTP状态码为200时，检查响应的内容是否为空
+                    # 不为空则success_count自增1
+                    raw_content = resp.content.strip()
+                    if len(raw_content) > 0:
+                        if self.content_has_character(raw_content):
+                            # 返回的网页内容含有指定的内容
+                            success_count += 1
+                        else:
+                            # 没有指定内容的话，视为无效代理
+                            break
+
+                    if success_count == 2:
+                        # 如已成功两次，即可退出循环
+                        break
+                resp.close()
+            except:
+                continue
+
+        if success_count >= 2:
+            response_avg_seconds = sum(response_times) / len(response_times)
+            proxy_item["response_avg_seconds"] = response_avg_seconds
+            self.MY_LOCK.acquire()
+            if self.MY_DEBUG:
+                print(proxy, "....OK!! %.2fs  PID:" % response_avg_seconds, str(os.getpid()))
+                with open(os.path.join(ProxyDetector.MY_PATH, "test", proxy_item["ip"] + '.html'), 'wb') as f:
+                    f.write(raw_content)
+            self.handle_alive_proxy(proxy_item)
+            self.MY_LOCK.release()
+            return proxy_item
+        else:
+            return False
+
+    @staticmethod
+    def load_proxys_list():
+        data_dir = ProxyDetector.MY_PATH
+        fs = os.walk(data_dir).__next__()[2]
+        proxys_list = []
+        for f in fs:
+            if str(f).endswith('.json'):
+                with open(os.path.join(data_dir, f), encoding="utf8") as fp:
+                    proxys_list.extend(json.load(fp))
+        return proxys_list
+
+    def before_job(self):
+        if self.MY_DEBUG:
+            print("ready to go, %d processes" % self.MY_PROCESSES_NUMBER)
+        result_path = os.path.join(ProxyDetector.MY_PATH, "result.txt")
+        if os.path.exists(result_path):
+            os.remove(result_path)
+
+    def after_job(self):
+        if self.MY_DEBUG:
+            alived_proxys = []
+            try:
+                while True:
+                    item = ProxyDetector.Q.get_nowait()
+                    alived_proxys.append(item)
+            except Empty:
+                pass
+            print("Done, %d alived proxys" % len(alived_proxys))
+            with open(os.path.join(self.MY_PATH, "q.json"), 'w', encoding='utf8') as qf:
+                json.dump(alived_proxys, qf, indent=4)
+
+    def check(self, proxys_list=[]):
+        self.before_job()
+        if self.MY_DEBUG:
+            proxys_list = self.load_proxys_list()
+        pool = Pool(self.MY_PROCESSES_NUMBER)
+        pool.map(self.check_alive, proxys_list)
+        self.after_job()
+
+    @staticmethod
+    def usage():
+        print("""实例化ProxyDetector，调用check""")
+        print("""check可接受的proxys_list为列表""")
+        print("""并且列表元素要求是字典，必须包含三个key：type、ip、port（整数）""")
+        print("""比如[{'type':'http','ip':'1.2.3.4','port':8080]""")
+
+if __name__ == '__main__':
+    obj = ProxyDetector()
+    obj.check()

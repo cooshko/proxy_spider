@@ -27,6 +27,7 @@ class ProxyDetector(object):
         self.MY_PROCESSES_NUMBER = getattr(config, "MY_PROCESSES_NUMBER", 10)
         self.MY_HEADERS = getattr(config, "MY_HEADERS", {"User-Agent": r"curl/7.47.0", "Accept": r"*/*", })
         self.MY_TARGET_CHARACTER = getattr(config, "MY_TARGET_CHARACTER", "")
+        self.alive_proxys = []
 
     def handle_alive_proxy(self, proxy_item):
         """
@@ -136,23 +137,19 @@ class ProxyDetector(object):
 
     def after_job(self):
         if self.MY_DEBUG:
-            alived_proxys = []
-            try:
-                while True:
-                    item = ProxyDetector.Q.get_nowait()
-                    alived_proxys.append(item)
-            except Empty:
-                pass
-            print("Done, %d alived proxys" % len(alived_proxys))
-            with open(os.path.join(self.MY_PATH, "q.json"), 'w', encoding='utf8') as qf:
-                json.dump(alived_proxys, qf, indent=4)
+            print("Done, %d alived proxys" % len(self.alive_proxys))
+            with open(os.path.join(self.MY_PATH, "q.txt"), 'w', encoding='utf8') as qf:
+                json.dump(self.alive_proxys, qf, indent=4)
 
     def check(self, proxys_list=[]):
         self.before_job()
         if self.MY_DEBUG:
             proxys_list = self.load_proxys_list()
         pool = Pool(self.MY_PROCESSES_NUMBER)
-        pool.map(self.check_alive, proxys_list)
+        res = pool.map(self.check_alive, proxys_list)
+        for item in res:
+            if item:
+                self.alive_proxys.append(item)
         self.after_job()
 
     @staticmethod

@@ -43,6 +43,10 @@ class ProxyPipeline(object):
     def close_spider(self, spider):
         data_dir = os.path.join(ROOT_DIR, 'proxy_data')
 
+        # 如果不存在数据目录，就先创建
+        if not os.path.exists(data_dir):
+            os.mkdir(data_dir)
+
         # 存json
         json_fp = os.path.join(data_dir, str(spider.name)+".json")
         with open(json_fp, 'w', encoding='utf8') as fp:

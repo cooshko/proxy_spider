@@ -6,7 +6,7 @@ import tornado.ioloop
 import tornado.web
 import redis
 
-REDIS_POOL = redis.ConnectionPool(host='127.0.0.1', port=16379, password="feiliuzhixia3qianchi")
+REDIS_POOL = redis.ConnectionPool(host='redis.com', port=16379, password="feiliuzhixia3qianchi")
 
 
 class MainHandler(tornado.web.RequestHandler):

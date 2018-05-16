@@ -8,6 +8,7 @@ class CheckProxySpider(scrapy.Spider):
     REDIS_POOL = redis.ConnectionPool(host='redis.com', port=16379, password="feiliuzhixia3qianchi")
     custom_settings = {
         "RETRY_ENABLED": False,
+        "CONCURRENT_REQUESTS": 32
     }
 
     def start_requests(self):

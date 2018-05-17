@@ -10,6 +10,9 @@ from proxy_spider.items import *
 from pprint import pprint
 import os
 import json
+import redis
+
+REDIS_POOL = redis.ConnectionPool(host='redis.com', port=16379, password='feiliuzhixia3qianchi')
 
 
 class ProxySpiderPipeline(object):
@@ -52,4 +55,8 @@ class ProxyPipeline(object):
         with open(json_fp, 'w', encoding='utf8') as fp:
             json.dump(self.proxy_list, fp)
 
-        # pprint(self.proxy_list)
+        # 存redis
+        r = redis.StrictRedis(connection_pool=REDIS_POOL)
+        for item in self.proxy_list:
+            proxy_str = "%s %s:%s" % (item['type'], item['ip'], item['port'])
+            r.sadd("new_proxies", proxy_str)

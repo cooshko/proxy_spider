@@ -29,7 +29,7 @@ class XiciSpider(scrapy.Spider):
                 if td_list:
                     pi = XiciItem(
                         ip=td_list[1].xpath("string(.)").extract_first().strip(),
-                        port=int(td_list[2].xpath("string(.)").extract_first().strip()),
+                        port=td_list[2].xpath("string(.)").extract_first().strip(),
                         geography=td_list[3].xpath("string(.)").extract_first().strip(),
                         anonymous=td_list[4].xpath("string(.)").extract_first().strip(),
                         type=td_list[5].xpath("string(.)").extract_first().strip(),

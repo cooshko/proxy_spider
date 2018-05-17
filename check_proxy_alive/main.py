@@ -10,6 +10,8 @@ from multiprocessing.pool import Pool
 from multiprocessing import Lock, Queue
 from multiprocessing.queues import Empty
 import chardet
+import redis
+import re
 sys.path.insert(0, os.path.dirname(__file__))
 import config
 
@@ -19,6 +21,7 @@ class ProxyDetector(object):
     MY_LOCK = Lock()
     MY_PATH = os.path.dirname(__file__)
     Q = Queue()
+    REDIS_POOL = redis.ConnectionPool(host='redis.com', port=16379, password='feiliuzhixia3qianchi')
 
     def __init__(self):
         self.MY_DEBUG = getattr(config, "MY_DEBUG", True)
@@ -37,7 +40,7 @@ class ProxyDetector(object):
         """
         ProxyDetector.Q.put(proxy_item)
         with open(os.path.join(ProxyDetector.MY_PATH, "result.txt"), "a", encoding="utf8") as fp1:
-            line = "|".join([str(proxy_item["type"]).lower(), "%s:%d" % (proxy_item["ip"], proxy_item["port"]),
+            line = "|".join([str(proxy_item["type"]).lower(), "%s:%s" % (proxy_item["ip"], proxy_item["port"]),
                              "%.2fs" % proxy_item["response_avg_seconds"]])
             fp1.write(line + "\n")
 
@@ -59,7 +62,7 @@ class ProxyDetector(object):
         # 组装requests.get里指定的proxy格式
         # proxy_type = str(proxy_item["type"]).lower().strip()
         proxy = dict()
-        proxy["http"] = proxy["https"] = "http://%s:%d" % (proxy_item["ip"], proxy_item["port"])
+        proxy["http"] = proxy["https"] = "http://%s:%s" % (proxy_item["ip"], proxy_item["port"])
         if self.MY_DEBUG:
             print(proxy)
         # 为保证质量，一个proxy验证三次（loop_count），必须至少成功两次（success_count），才算有效
@@ -119,14 +122,36 @@ class ProxyDetector(object):
 
     @staticmethod
     def load_proxys_list():
-        data_dir = ProxyDetector.MY_PATH
-        fs = os.walk(data_dir).__next__()[2]
         proxys_list = []
-        for f in fs:
-            if str(f).endswith('.json'):
-                with open(os.path.join(data_dir, f), encoding="utf8") as fp:
-                    proxys_list.extend(json.load(fp))
+
+        # data_dir = ProxyDetector.MY_PATH
+        # fs = os.walk(data_dir).__next__()[2]
+        #
+        # for f in fs:
+        #     if str(f).endswith('.json'):
+        #         with open(os.path.join(data_dir, f), encoding="utf8") as fp:
+        #             proxys_list.extend(json.load(fp))
+
+        r = redis.StrictRedis(connection_pool=ProxyDetector.REDIS_POOL)
+        new_proxies = r.smembers('new_proxies')
+        for item in new_proxies:
+            proxy_str = item.decode("utf8").lower()
+
+            result = re.findall(r'^(\w+) (.+):(\d+).*$', proxy_str)
+            if result:
+                proxy = dict(
+                    type=result[0][0],
+                    ip=result[0][1],
+                    port=result[0][2]
+                )
+                proxys_list.append(proxy)
+        r.srem("new_proxies", *new_proxies)
         return proxys_list
+
+    @staticmethod
+    def str_serializer(proxy_dict: dict):
+        ret = "%s %s:%s" % (proxy_dict['type'], proxy_dict['ip'], str(proxy_dict['port']))
+        return ret.lower()
 
     def before_job(self):
         if self.MY_DEBUG:
@@ -140,6 +165,11 @@ class ProxyDetector(object):
             print("Done, %d alived proxys" % len(self.alive_proxys))
             with open(os.path.join(self.MY_PATH, "q.txt"), 'w', encoding='utf8') as qf:
                 json.dump(self.alive_proxys, qf, indent=4)
+
+        # 将有效的代理推到redis的alive_proxy集合里
+        r = redis.StrictRedis(connection_pool=ProxyDetector.REDIS_POOL)
+        for item in self.alive_proxys:
+            r.sadd("alive_proxies", self.str_serializer(item))
 
     def check(self, proxys_list=[]):
         self.before_job()

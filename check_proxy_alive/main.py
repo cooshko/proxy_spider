@@ -171,7 +171,9 @@ class ProxyDetector(object):
         for item in self.alive_proxys:
             r.sadd("alive_proxies", self.str_serializer(item))
 
-    def check(self, proxys_list=[]):
+    def check(self, proxys_list=None):
+        if proxys_list is None:
+            proxys_list = []
         self.before_job()
         if self.MY_DEBUG:
             proxys_list = self.load_proxys_list()
@@ -188,6 +190,7 @@ class ProxyDetector(object):
         print("""check可接受的proxys_list为列表""")
         print("""并且列表元素要求是字典，必须包含三个key：type、ip、port（整数）""")
         print("""比如[{'type':'http','ip':'1.2.3.4','port':8080]""")
+
 
 if __name__ == '__main__':
     obj = ProxyDetector()

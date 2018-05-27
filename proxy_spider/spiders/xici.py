@@ -20,22 +20,6 @@ class XiciSpider(scrapy.Spider):
     def parse(self, response):
         if response.status == 200:
             # 正常返回页面
-            ip_list_table = response.css("table#ip_list")
-            ip_rows = ip_list_table.css("tr")
-
-            # 提取每行代理信息
-            for row in ip_rows:
-                td_list = row.css("td")
-                if td_list:
-                    pi = XiciItem(
-                        ip=td_list[1].xpath("string(.)").extract_first().strip(),
-                        port=td_list[2].xpath("string(.)").extract_first().strip(),
-                        geography=td_list[3].xpath("string(.)").extract_first().strip(),
-                        anonymous=td_list[4].xpath("string(.)").extract_first().strip(),
-                        type=td_list[5].xpath("string(.)").extract_first().strip(),
-                        # fromurl=response.url
-                    )
-                    yield pi
 
             # 导航链接
             pagination_a = response.css("div.pagination a")
@@ -43,6 +27,31 @@ class XiciSpider(scrapy.Spider):
                 next_page = response.urljoin(a.css("::attr(href)").extract_first())
                 page_num = int(str(next_page).split(r'/')[-1])
                 if page_num < self.settings.get("DEPTH", 10):
-                    # with open("visited_url.log", "a", encoding='utf8') as fp:
-                    #     fp.write(next_page+"\n")
                     yield scrapy.Request(url=next_page)
+
+            # 当前页面内的代理列表
+            for sel in response.xpath('//table[@id="ip_list"]/tr[position()>1]'):
+                ip = sel.css('td:nth-child(2)::text').extract_first()
+                port = sel.css('td:nth-child(3)::text').extract_first()
+                scheme = sel.css('td:nth-child(6)::text').extract_first().lower()
+
+                url = 'http://2018.ip138.com/ic.asp'
+                proxy = '%s://%s:%s' % (scheme, ip, port)
+
+                meta = {
+                    'proxy': proxy,
+                    'dont_retry': True,
+                    '_proxy_scheme': scheme,
+                    '_proxy_ip': ip
+                }
+
+                yield scrapy.Request(url=url, callback=self.check_available,
+                                     meta=meta, dont_filter=True)
+
+    def check_available(self, response):
+        if response.status == 200:
+            if "来自" in response.text:
+                yield {
+                    '_proxy_scheme': response.meta['_proxy_scheme'],
+                    'proxy': response.meta['proxy']
+                }

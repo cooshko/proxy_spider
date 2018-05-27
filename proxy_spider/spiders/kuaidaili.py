@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import scrapy
-from proxy_spider.items import KuaidailiItem
+from proxy_spider.items import ProxyItem
 from pprint import pprint
 
 
@@ -18,20 +18,6 @@ class KuaidailiSpider(scrapy.Spider):
                 # 遇到反爬虫，再刷新一下
                 yield scrapy.Request(url=response.url, dont_filter=True)
             else:
-                # 返回正常的页面
-                trs = response.css("div#list > table tbody tr")
-                for row in trs:
-                    td_list = row.css("td")
-                    if td_list:
-                        pi = KuaidailiItem(
-                            ip=td_list[0].xpath("string(.)").extract_first().strip(),
-                            port=td_list[1].xpath("string(.)").extract_first().strip(),
-                            anonymous=td_list[2].xpath("string(.)").extract_first().strip(),
-                            type=td_list[3].xpath("string(.)").extract_first().strip(),
-                            geography=td_list[4].xpath("string(.)").extract_first().strip(),
-                        )
-                        yield pi
-
                 # 导航链接
                 pagination_a = response.css("div#listnav a")
                 for a in pagination_a:
@@ -42,3 +28,15 @@ class KuaidailiSpider(scrapy.Spider):
                         #     fp.write(next_page + "\n")
                         yield scrapy.Request(url=next_page)
 
+                # 返回正常的页面
+                trs = response.css("div#list > table tbody tr")
+                for row in trs:
+                    td_list = row.css("td")
+                    if td_list:
+                        ip=td_list[0].xpath("string(.)").extract_first().strip()
+                        port=td_list[1].xpath("string(.)").extract_first().strip()
+                        anonymous=td_list[2].xpath("string(.)").extract_first().strip()
+                        scheme=td_list[3].xpath("string(.)").extract_first().strip()
+                        geography=td_list[4].xpath("string(.)").extract_first().strip()
+                        proxy = '%s://%s:%s' % (scheme, ip, port)
+                        yield ProxyItem(proxy=proxy)

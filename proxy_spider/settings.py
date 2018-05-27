@@ -97,3 +97,6 @@ ROOT_DIR = os.path.dirname(__file__)
 
 # 层数
 DEPTH = 10
+
+# 下载超时时间
+DOWNLOAD_TIMEOUT = 2

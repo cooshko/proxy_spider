@@ -26,10 +26,11 @@ class DuplicatesPipeline(object):
 
     def process_item(self, item, spider):
         if isinstance(item, ProxyItem):
-            if item['proxy'] in self.ids_seen:
+            iid = item['type'] + item['ip'] + str(item['port'])
+            if iid in self.ids_seen:
                 raise DropItem("Duplicate item found: %s" % item)
             else:
-                self.ids_seen.add(item['proxy'])
+                self.ids_seen.add(iid)
         return item
 
 
@@ -39,7 +40,7 @@ class ProxyPipeline(object):
 
     def process_item(self, item, spider):
         if isinstance(item, ProxyItem):
-            self.proxy_list.append(item['proxy'])
+            self.proxy_list.append(dict(item))
         return item
 
     def close_spider(self, spider):
@@ -49,17 +50,13 @@ class ProxyPipeline(object):
         if not os.path.exists(data_dir):
             os.mkdir(data_dir)
 
-        # 存文件
-        with open(os.path.join(data_dir, str(spider.name)+'.txt'), 'w', encoding='utf-8') as f:
-            f.writelines("\n".join(self.proxy_list))
-
         # 存json
-        # json_fp = os.path.join(data_dir, str(spider.name)+".json")
-        # with open(json_fp, 'w', encoding='utf8') as fp:
-        #     json.dump(self.proxy_list, fp)
+        json_fp = os.path.join(data_dir, str(spider.name)+".json")
+        with open(json_fp, 'w', encoding='utf8') as fp:
+            json.dump(self.proxy_list, fp)
 
-        # # 存redis
-        # r = redis.StrictRedis(connection_pool=REDIS_POOL)
-        # for item in self.proxy_list:
-        #     proxy_str = "%s %s:%s" % (item['type'], item['ip'], item['port'])
-        #     r.sadd("new_proxies", proxy_str)
+        # 存redis
+        r = redis.StrictRedis(connection_pool=REDIS_POOL)
+        for item in self.proxy_list:
+            proxy_str = "%s %s:%s" % (item['type'], item['ip'], item['port'])
+            r.sadd("new_proxies", proxy_str)

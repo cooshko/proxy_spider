@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import scrapy
-from proxy_spider.items import XiciItem
+from proxy_spider.items import ProxyItem
 import os
 from pprint import pprint
 
@@ -34,24 +34,21 @@ class XiciSpider(scrapy.Spider):
                 ip = sel.css('td:nth-child(2)::text').extract_first()
                 port = sel.css('td:nth-child(3)::text').extract_first()
                 scheme = sel.css('td:nth-child(6)::text').extract_first().lower()
-
-                url = 'http://2018.ip138.com/ic.asp'
                 proxy = '%s://%s:%s' % (scheme, ip, port)
-
-                meta = {
-                    'proxy': proxy,
-                    'dont_retry': True,
-                    '_proxy_scheme': scheme,
-                    '_proxy_ip': ip
-                }
-
-                yield scrapy.Request(url=url, callback=self.check_available,
-                                     meta=meta, dont_filter=True)
-
-    def check_available(self, response):
-        if response.status == 200:
-            if "来自" in response.text:
-                yield {
-                    '_proxy_scheme': response.meta['_proxy_scheme'],
-                    'proxy': response.meta['proxy']
-                }
+                yield ProxyItem(proxy=proxy)
+    #             url = 'http://2018.ip138.com/ic.asp'
+    #             meta = {
+    #                 'proxy': proxy,
+    #                 'dont_retry': True,
+    #                 '_proxy_scheme': scheme,
+    #                 '_proxy_ip': ip,
+    #                 'download_timeout': 2,
+    #             }
+    #
+    #             yield scrapy.Request(url=url, callback=self.check_available,
+    #                                  meta=meta, dont_filter=True)
+    #
+    # def check_available(self, response):
+    #     if response.status == 200:
+    #         if "来自" in response.text:
+    #             yield ProxyItem(proxy=response.meta['proxy'])

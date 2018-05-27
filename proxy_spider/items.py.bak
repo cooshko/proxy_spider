@@ -15,4 +15,17 @@ class ProxySpiderItem(scrapy.Item):
 
 
 class ProxyItem(scrapy.Item):
-    proxy = scrapy.Field()
+    ip = scrapy.Field()
+    port = scrapy.Field()
+    geography = scrapy.Field()
+    anonymous = scrapy.Field()
+    type = scrapy.Field()
+    # fromurl = scrapy.Field()
+
+
+class XiciItem(ProxyItem):
+    pass
+
+
+class KuaidailiItem(ProxyItem):
+    pass

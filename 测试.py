@@ -6,7 +6,7 @@ from check_proxy_alive import ProxyDetector
 
 if __name__ == '__main__':
     obj = ProxyDetector()
-    obj.check()
+    obj.start()
 
 
 

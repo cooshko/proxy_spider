@@ -147,8 +147,8 @@ class ProxyDetector(object):
         item = json.loads(body.decode('utf8'))
         item_type = item[0]
         item_proxy = item[1]
-        self.check_alive(item_type, item_proxy)
-        # self.mp_pool.apply_async(self.check_alive, (item_type, item_proxy))
+        # self.check_alive(item_type, item_proxy)
+        self.mp_pool.apply_async(self.check_alive, (item_type, item_proxy))
 
     @staticmethod
     def usage():

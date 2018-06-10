@@ -6,7 +6,7 @@ import tornado.ioloop
 import tornado.web
 import redis
 
-REDIS_POOL = redis.ConnectionPool(host='redis.com', port=16379, password="feiliuzhixia3qianchi")
+REDIS_POOL = redis.ConnectionPool(host='myserver.com', port=16379, password="feiliuzhixia3qianchi")
 
 
 class MainHandler(tornado.web.RequestHandler):
@@ -18,24 +18,24 @@ class GetLatestHandler(tornado.web.RequestHandler):
     def get(self):
         global REDIS_POOL
         r = redis.StrictRedis(connection_pool=REDIS_POOL, charset='utf-8')
-        result = [x.decode("utf8") for x in r.smembers("new_proxies")]
+        result = [x.decode("utf8") for x in r.smembers("alive_proxies")]
         self.write(json.dumps(result))
 
 
-class PostProxiesHandler(tornado.web.RequestHandler):
+class ReportProxyHandler(tornado.web.RequestHandler):
     def post(self):
-        content_type = self.get_argument("content_type")
-        content = self.get_argument("content")
-        proxy_list = []
-        if content_type:
-            content_type = content_type.lower()
-            if content_type == "json":
-                self.handle_json(content)
-                return
-            else:
-                self.write("unsupport content type")
+        proxy = self.get_argument("proxy_maybe_fail")
+        r = redis.StrictRedis(connection_pool=REDIS_POOL, charset='utf-8')
+        result = dict(result="")
+        if r.sismember("alive_proxies", proxy):
+            # 验证proxy是否有效
+            pass
+        else:
+            result['result'] = "{} is not our member.".format(proxy)
+        self.write(json.dumps(result))
 
-    def handle_json(self, json_str: str):
+
+def handle_json(self, json_str: str):
         global REDIS_POOL
         r = redis.StrictRedis(connection_pool=REDIS_POOL, charset='utf-8')
         obj = json.loads(json_str)
@@ -51,7 +51,7 @@ def make_app():
     return tornado.web.Application([
         (r"/", MainHandler),
         (r'/latest_proxy.html', GetLatestHandler),
-        (r'/post_proxy.html.html', PostProxiesHandler),
+        (r'/post_proxy.html', PostProxiesHandler),
     ], debug=True)
 
 

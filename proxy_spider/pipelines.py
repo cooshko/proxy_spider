@@ -40,7 +40,7 @@ class ProxyPipeline(object):
 
     def process_item(self, item, spider):
         if isinstance(item, ProxyItem):
-            self.proxy_list.append(item['proxy'])
+            self.proxy_list.append(item['proxy'].lower())
         return item
 
     def close_spider(self, spider):

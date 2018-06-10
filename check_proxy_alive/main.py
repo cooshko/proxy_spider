@@ -6,8 +6,8 @@ import os
 import sys
 import time
 import requests
-from multiprocessing.pool import ThreadPool as Pool
-from multiprocessing import Lock, Queue, cpu_count
+from multiprocessing.pool import ThreadPool, Pool
+from multiprocessing import Lock, Queue, cpu_count, Process
 from multiprocessing.queues import Empty
 import chardet
 import redis
@@ -29,7 +29,7 @@ class ProxyDetector(object):
         self.MY_TARGET = getattr(config, "MY_TARGET", r"http://ip.cn/?")
         self.MY_TIMEOUT = getattr(config, "MY_TIMEOUT", 2.0)
         self.MY_PROCESSES_NUMBER = cpu_count()
-        self.mp_pool = Pool(self.MY_PROCESSES_NUMBER)
+        self.mp_pool = ThreadPool(self.MY_PROCESSES_NUMBER)
         self.MY_HEADERS = getattr(config, "MY_HEADERS", {"User-Agent": r"curl/7.47.0", "Accept": r"*/*", })
         self.MY_TARGET_CHARACTER = getattr(config, "MY_TARGET_CHARACTER", "")
         self.alive_proxys = []
@@ -68,7 +68,7 @@ class ProxyDetector(object):
         # 全局变量：验证网站、是否调试、超时时间
         proxy = proxy.lower()
         proxies = dict()
-        proxies["http"] = proxies["https"] = proxy
+        proxies["http"] = proxies["https"] = proxy.replace('https', 'http')
         if self.MY_DEBUG:
             print(proxy)
         # 为保证质量，一个proxy验证三次（loop_count），必须至少成功两次（success_count），才算有效
@@ -77,9 +77,6 @@ class ProxyDetector(object):
 
         # 平均响应时间
         response_times = []
-
-        # 返回的网页原始内容
-        raw_content = b''
 
         while loop_count < 3:
             try:
@@ -161,6 +158,17 @@ class ProxyDetector(object):
         print("""比如[{'type':'http','ip':'1.2.3.4','port':8080]""")
 
 
-if __name__ == '__main__':
+def main():
     obj = ProxyDetector()
     obj.start()
+
+
+if __name__ == '__main__':
+    p_list = []
+    for i in range(cpu_count()):
+        p = Process(target=main)
+        p_list.append(p)
+        p.start()
+
+    for p in p_list:
+        p.join()

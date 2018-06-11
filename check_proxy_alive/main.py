@@ -49,8 +49,10 @@ class ProxyDetector(object):
         :param proxy:
         :return:
         """
+        self.MY_LOCK.acquire()
         r = redis.StrictRedis(connection_pool=ProxyDetector.REDIS_POOL)
-        r.srem('alive_proxies', *[proxy])
+        r.srem('alive_proxies', proxy)
+        self.MY_LOCK.release()
 
     def content_has_character(self, raw_content: bytes):
         detect_result = chardet.detect(raw_content)
@@ -70,7 +72,7 @@ class ProxyDetector(object):
         proxies = dict()
         proxies["http"] = proxies["https"] = proxy.replace('https', 'http')
         if self.MY_DEBUG:
-            print(proxy)
+            print(validation_type, proxy)
         # 为保证质量，一个proxy验证三次（loop_count），必须至少成功两次（success_count），才算有效
         success_count = 0
         loop_count = 0
@@ -114,16 +116,22 @@ class ProxyDetector(object):
             self.MY_LOCK.acquire()
             if self.MY_DEBUG:
                 print(proxy, "....OK!! %.2fs  PID:" % response_avg_seconds, str(os.getpid()))
-            self.handle_alive_proxy(proxy)
+            if validation_type == 'new':
+                self.handle_alive_proxy(proxy)
             self.MY_LOCK.release()
             return proxy
         else:
-            if validation_type == 'revalidation':
-                self.handle_revalidation_fail(proxy)
+            # if validation_type == 'revalidation':
+            self.MY_LOCK.acquire()
+            print("removing", proxy)
+            self.MY_LOCK.release()
+            self.handle_revalidation_fail(proxy)
+
 
     def before_job(self):
         if self.MY_DEBUG:
-            print("ready to go, %d processes" % self.MY_PROCESSES_NUMBER)
+            #     print("ready to go, %d processes" % self.MY_PROCESSES_NUMBER)
+            print("waiting for message...")
         result_path = os.path.join(ProxyDetector.MY_PATH, "result.txt")
         if os.path.exists(result_path):
             os.remove(result_path)
@@ -139,7 +147,7 @@ class ProxyDetector(object):
         channel.queue_declare(queue="need_validation")
 
         channel.basic_consume(queue="need_validation",  # 从指定队列读取消息
-                              no_ack=False,  # 不用确认该消息，ack功能用于防止消息丢失
+                              no_ack=True,  # 不用确认该消息，ack功能用于防止消息丢失
                               consumer_callback=self.mq_consumer)  # 收到的数据，使用回调函数去处理，这里使用上方定义的callback函数
         channel.start_consuming()  # 开始不停的获取消息，注意，它是阻塞的
 

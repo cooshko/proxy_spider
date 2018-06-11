@@ -5,6 +5,7 @@ import json
 import tornado.ioloop
 import tornado.web
 import redis
+import pika
 
 REDIS_POOL = redis.ConnectionPool(host='myserver.com', port=16379, password="feiliuzhixia3qianchi")
 
@@ -29,29 +30,33 @@ class ReportProxyHandler(tornado.web.RequestHandler):
         result = dict(result="")
         if r.sismember("alive_proxies", proxy):
             # 验证proxy是否有效
-            pass
+            self.report_proxy(proxy)
         else:
             result['result'] = "{} is not our member.".format(proxy)
         self.write(json.dumps(result))
 
+    def report_proxy(self, proxy):
+        # 推到消息队列中去
+        cred = pika.PlainCredentials("http_proxy_user", "feiliuzhixia3qianchi")  # 远程访问的用户名、密码，如果不使用，则会默认调用guest/guest
+        conn = pika.BlockingConnection(pika.ConnectionParameters(host="myserver.com",
+                                                                 port=5672,
+                                                                 credentials=cred,
+                                                                 virtual_host='http_proxy_vhost'))  # 连接
+        channel = conn.channel()  # channel负责收发消息
+        channel.queue_declare(queue="need_validation")  # 声明一个队列，如果队列已经存在则忽略，如果不存在则创建
 
-def handle_json(self, json_str: str):
-        global REDIS_POOL
-        r = redis.StrictRedis(connection_pool=REDIS_POOL, charset='utf-8')
-        obj = json.loads(json_str)
-        if isinstance(obj, list):
-            proxy_list = []
-            for item in obj:
-                proxy_str = "%s %s:%s" % (item["type"], item["ip"], str(item["port"]))
-                proxy_list.append(proxy_str.lower())
-            r.sadd("new_proxies", *proxy_list)
+        channel.basic_publish(exchange="",
+                              routing_key="need_validation",  # 相当于要往哪个队列里发消息
+                              body=json.dumps(['revalidation', proxy]))  # 具体的消息内容
+        # print("Done")
+        conn.close()  # 发完数据就可以关闭链接了
 
 
 def make_app():
     return tornado.web.Application([
         (r"/", MainHandler),
         (r'/latest_proxy.html', GetLatestHandler),
-        (r'/post_proxy.html', PostProxiesHandler),
+        (r'/proxy_maybe_fail.html', ReportProxyHandler),
     ], debug=True)
 
 

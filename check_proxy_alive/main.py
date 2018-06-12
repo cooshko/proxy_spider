@@ -86,7 +86,9 @@ class ProxyDetector(object):
 
                 # 已经两次失败情况下，没必要进入第三次loop
                 if loop_count == 3 and success_count == 0:
-                    return False
+                    if validation_type == 'revalidation':
+                        self.handle_revalidation_fail(proxy)
+                        return False
 
                 start_time = time.time()  # 用于计算响应时间
                 resp = requests.get(url=self.MY_TARGET, proxies=proxies, timeout=self.MY_TIMEOUT, headers=self.MY_HEADERS)
@@ -121,11 +123,11 @@ class ProxyDetector(object):
             self.MY_LOCK.release()
             return proxy
         else:
-            # if validation_type == 'revalidation':
-            self.MY_LOCK.acquire()
-            print("removing", proxy)
-            self.MY_LOCK.release()
-            self.handle_revalidation_fail(proxy)
+            if validation_type == 'revalidation':
+                # self.MY_LOCK.acquire()
+                # print("removing", proxy)
+                # self.MY_LOCK.release()
+                self.handle_revalidation_fail(proxy)
 
 
     def before_job(self):

@@ -140,18 +140,22 @@ class ProxyDetector(object):
 
     def start(self):
         self.before_job()
-        cred = pika.PlainCredentials("http_proxy_user", "feiliuzhixia3qianchi")
-        conn = pika.BlockingConnection(pika.ConnectionParameters(host="myserver.com",
-                                                                 port=5672,
-                                                                 credentials=cred,
-                                                                 virtual_host='http_proxy_vhost'))
-        channel = conn.channel()
-        channel.queue_declare(queue="need_validation")
+        while True:
+            try:
+                cred = pika.PlainCredentials("http_proxy_user", "feiliuzhixia3qianchi")
+                conn = pika.BlockingConnection(pika.ConnectionParameters(host="myserver.com",
+                                                                         port=5672,
+                                                                         credentials=cred,
+                                                                         virtual_host='http_proxy_vhost'))
+                channel = conn.channel()
+                channel.queue_declare(queue="need_validation")
 
-        channel.basic_consume(queue="need_validation",  # 从指定队列读取消息
-                              no_ack=True,  # 不用确认该消息，ack功能用于防止消息丢失
-                              consumer_callback=self.mq_consumer)  # 收到的数据，使用回调函数去处理，这里使用上方定义的callback函数
-        channel.start_consuming()  # 开始不停的获取消息，注意，它是阻塞的
+                channel.basic_consume(queue="need_validation",  # 从指定队列读取消息
+                                      no_ack=True,  # 不用确认该消息，ack功能用于防止消息丢失
+                                      consumer_callback=self.mq_consumer)  # 收到的数据，使用回调函数去处理，这里使用上方定义的callback函数
+                channel.start_consuming()  # 开始不停的获取消息，注意，它是阻塞的
+            except:
+                time.sleep(3)
 
     def mq_consumer(self, ch, method, properties, body):
         item = json.loads(body.decode('utf8'))

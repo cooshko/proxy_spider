@@ -31,6 +31,7 @@ class ReportProxyHandler(tornado.web.RequestHandler):
         if r.sismember("alive_proxies", proxy):
             # 验证proxy是否有效
             self.report_proxy(proxy)
+            result['result'] = "ok"
         else:
             result['result'] = "{} is not our member.".format(proxy)
         self.write(json.dumps(result))

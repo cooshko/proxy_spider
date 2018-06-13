@@ -14,6 +14,6 @@
 #####proxy_www - tornado、pika、redis
 
 ##部署和用法
-#####check_proxy_alive - 执行main.py
-#####proxy_spider - scrapy crawl xici（或者kuaidaili）
-#####proxy_www - 执行tornado_www.py
+#####check_proxy_alive - 执行main.py，配置信息在config.py里
+#####proxy_spider - 命令行下进入该目录，scrapy crawl xici（或者kuaidaili）， 需在pipeline.py里指定rabbitmq的参数
+#####proxy_www - 执行tornado_www.py，参数在文件开头指定，预设监听8888端口，可用的URL：/latest_proxy.html 获取最新的可用的代理；/proxy_maybe_fail.html 如果有代理可能失效，可以POST {proxy: http://xx.xxx...} 到这个URL，系统会安排验证，如确实失效，会剔除出有效代理池

@@ -15,5 +15,15 @@ MY_TARGET_CHARACTER = "来自"
 
 MY_DEBUG = True
 MY_TIMEOUT = 2.0
-MY_PROCESSES_NUMBER = 20
 
+# pika
+RABBIT_HOST = 'myserver.com'
+RABBIT_PORT = 5672
+RABBIT_USER = "http_proxy_user"
+RABBIT_PASSWORD = 'feiliuzhixia3qianchi'
+RABBIT_VHOST = 'http_proxy_vhost'
+
+# redis
+REDIS_HOST = 'myserver.com'
+REDIS_PORT = 16379
+REDIS_PASSWORD = 'feiliuzhixia3qianchi'

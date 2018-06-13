@@ -8,7 +8,7 @@ import redis
 import pika
 
 REDIS_POOL = redis.ConnectionPool(host='myserver.com', port=16379, password="feiliuzhixia3qianchi")
-
+HTTP_PORT = 8888
 
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
@@ -63,5 +63,5 @@ def make_app():
 
 if __name__ == "__main__":
     app = make_app()
-    app.listen(8888)
+    app.listen(HTTP_PORT)
     tornado.ioloop.IOLoop.current().start()

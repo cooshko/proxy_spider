@@ -22,14 +22,16 @@ class ProxyDetector(object):
     MY_LOCK = Lock()
     MY_PATH = os.path.dirname(__file__)
     Q = Queue()
-    REDIS_POOL = redis.ConnectionPool(host='myserver.com', port=16379, password='feiliuzhixia3qianchi')
+    REDIS_POOL = redis.ConnectionPool(host=config.REDIS_HOST,
+                                      port=config.REDIS_PORT,
+                                      password=config.REDIS_PASSWORD)
 
     def __init__(self):
         self.MY_DEBUG = getattr(config, "MY_DEBUG", True)
         self.MY_TARGET = getattr(config, "MY_TARGET", r"http://ip.cn/?")
         self.MY_TIMEOUT = getattr(config, "MY_TIMEOUT", 2.0)
         self.MY_PROCESSES_NUMBER = cpu_count()
-        self.mp_pool = ThreadPool(self.MY_PROCESSES_NUMBER)
+        self.pool = ThreadPool(self.MY_PROCESSES_NUMBER)
         self.MY_HEADERS = getattr(config, "MY_HEADERS", {"User-Agent": r"curl/7.47.0", "Accept": r"*/*", })
         self.MY_TARGET_CHARACTER = getattr(config, "MY_TARGET_CHARACTER", "")
         self.alive_proxys = []
@@ -129,7 +131,6 @@ class ProxyDetector(object):
                 # self.MY_LOCK.release()
                 self.handle_revalidation_fail(proxy)
 
-
     def before_job(self):
         if self.MY_DEBUG:
             #     print("ready to go, %d processes" % self.MY_PROCESSES_NUMBER)
@@ -142,11 +143,11 @@ class ProxyDetector(object):
         self.before_job()
         while True:
             try:
-                cred = pika.PlainCredentials("http_proxy_user", "feiliuzhixia3qianchi")
-                conn = pika.BlockingConnection(pika.ConnectionParameters(host="myserver.com",
-                                                                         port=5672,
+                cred = pika.PlainCredentials(config.RABBIT_USER, config.RABBIT_PASSWORD)
+                conn = pika.BlockingConnection(pika.ConnectionParameters(host=config.RABBIT_HOST,
+                                                                         port=config.RABBIT_PORT,
                                                                          credentials=cred,
-                                                                         virtual_host='http_proxy_vhost'))
+                                                                         virtual_host=config.RABBIT_VHOST))
                 channel = conn.channel()
                 channel.queue_declare(queue="need_validation")
 
@@ -162,14 +163,7 @@ class ProxyDetector(object):
         item_type = item[0]
         item_proxy = item[1]
         # self.check_alive(item_type, item_proxy)
-        self.mp_pool.apply_async(self.check_alive, (item_type, item_proxy))
-
-    @staticmethod
-    def usage():
-        print("""实例化ProxyDetector，调用check""")
-        print("""check可接受的proxys_list为列表""")
-        print("""并且列表元素要求是字典，必须包含三个key：type、ip、port（整数）""")
-        print("""比如[{'type':'http','ip':'1.2.3.4','port':8080]""")
+        self.pool.apply_async(self.check_alive, (item_type, item_proxy))
 
 
 def main():

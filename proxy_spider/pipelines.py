@@ -1,19 +1,10 @@
 # -*- coding: utf-8 -*-
-
-# Define your item pipelines here
-#
-# Don't forget to add your pipeline to the ITEM_PIPELINES setting
-# See: http://doc.scrapy.org/en/latest/topics/item-pipeline.html
 from scrapy.exceptions import DropItem
 from proxy_spider.settings import ROOT_DIR
 from proxy_spider.items import *
-from pprint import pprint
 import os
 import json
 import pika
-# import redis
-#
-# REDIS_POOL = redis.ConnectionPool(host='redis.com', port=16379, password='feiliuzhixia3qianchi')
 
 
 class ProxySpiderPipeline(object):
@@ -58,12 +49,6 @@ class ProxyPipeline(object):
         # json_fp = os.path.join(data_dir, str(spider.name)+".json")
         # with open(json_fp, 'w', encoding='utf8') as fp:
         #     json.dump(self.proxy_list, fp)
-
-        # # 存redis
-        # r = redis.StrictRedis(connection_pool=REDIS_POOL)
-        # for item in self.proxy_list:
-        #     proxy_str = "%s %s:%s" % (item['type'], item['ip'], item['port'])
-        #     r.sadd("new_proxies", proxy_str)
 
         # 推到消息队列中去
         cred = pika.PlainCredentials("http_proxy_user", "feiliuzhixia3qianchi")  # 远程访问的用户名、密码，如果不使用，则会默认调用guest/guest
